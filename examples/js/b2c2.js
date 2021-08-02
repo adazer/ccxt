@@ -38,10 +38,15 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     // // output the result
     // log (exchange.name.green, 'ledger', ledger)
 
-    let trades = await exchange.fetchMyTrades ()
+    // let trades = await exchange.fetchMyTrades ()
+
+    // // output the result
+    // log (exchange.name.green, 'trades', trades)
+
+    let order = await exchange.createOrder ('ETHUSD.SPOT', 'MARKET', 'BUY', 1,)
 
     // output the result
-    log (exchange.name.green, 'trades', trades)
+    log (exchange.name.green, 'order', order)
 
     // fetch account balance from the exchange
     // let balance = await exchange.fetchBalance ()

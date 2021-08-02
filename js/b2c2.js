@@ -21,7 +21,7 @@ module.exports = class b2c2 extends Exchange {
                 'fetchMarkets': true, // partially implemented
                 'fetchOrders': true, // partially implemented
                 'fetchLedger': true, // partially implemented
-                'fetchMyTrades': true,
+                'fetchMyTrades': true, // partially implemented
                 'fetchOrder': true,
                 'fetchWithdrawals': true,
                 'createOrder': true,
@@ -67,6 +67,7 @@ module.exports = class b2c2 extends Exchange {
             'markets': {
                 'BTCUSD.SPOT': { 'id': 'btc', 'symbol': 'BTCUSD.SPOT', 'base': 'BTC', 'quote': 'USD', 'baseId': 'btc', 'quoteId': 'usd' },
                 'ETHUSD.SPOT': { 'id': 'eth', 'symbol': 'ETHUSD.SPOT', 'base': 'ETH', 'quote': 'USD', 'baseId': 'eth', 'quoteId': 'usd' },
+                'XRPUSD.SPOT': { 'id': 'xrp', 'symbol': 'XRPUSD.SPOT', 'base': 'XRP', 'quote': 'USD', 'baseId': 'xrp', 'quoteId': 'usd' },
             },
             'exceptions': {
                 '400': ExchangeError, // At least one parameter wasn't set
@@ -251,56 +252,23 @@ module.exports = class b2c2 extends Exchange {
         const uppercaseSide = side.toUpperCase ();
         const uppercaseType = type.toUpperCase ();
         const request = {
-            'symbol': market['id'],
+            'client_order_id': '123456', // to parameterise
             'quantity': this.amountToPrecision (symbol, amount),
             'side': uppercaseSide,
-            'orderTypes': uppercaseType,
-            // 'clientOrderId': '123',
+            'instrument': market['id'],
+            'order_type': uppercaseType,
             // 'expireIn': 1575523308, // in seconds
             // 'expireTime': 1575523308, // unix timestamp
         };
-        let query = params;
         if (uppercaseType === 'LIMIT') {
+            request['order_type'] = 'FOK';
             request['price'] = this.priceToPrecision (symbol, price);
-            const defaultExpireIn = this.safeInteger (this.options, 'expireIn');
-            const expireTime = this.safeValue (params, 'expireTime');
-            const expireIn = this.safeValue (params, 'expireIn', defaultExpireIn);
-            if (expireTime !== undefined) {
-                request['expireTime'] = expireTime;
-            } else if (expireIn !== undefined) {
-                request['expireIn'] = expireIn;
-            } else {
-                throw new InvalidOrder (this.id + ' createOrder() method requires a expireTime or expireIn param for a ' + type + ' order, you can also set the expireIn exchange-wide option');
-            }
-            query = this.omit (params, [ 'expireTime', 'expireIn' ]);
         } else {
+            request['order_type'] = 'MKT';
             request['price'] = 0;
         }
-        const response = await this.tradingPostOrders (this.extend (request, query));
-        //
-        //     {
-        //         "orders": [
-        //             {
-        //                 "cancelledQuantity": "0.3",
-        //                 "clientOrderId": "my-order-1",
-        //                 "createdAt": "1970-01-01T00:00:00",
-        //                 "cursorId": 50,
-        //                 "expireTime": "1970-01-01T00:00:00",
-        //                 "filledQuantity": "0.3",
-        //                 "id": "string",
-        //                 "price": "0.017",
-        //                 "quantity": "0.3",
-        //                 "side": "BUY",
-        //                 "symbol": "TIMEETH",
-        //                 "type": "LIMIT",
-        //                 "updatedAt": "1970-01-01T00:00:00"
-        //             }
-        //         ]
-        //     }
-        //
-        const orders = this.safeValue (response, 'orders', []);
-        const order = this.safeValue (orders, 0, {});
-        return this.parseOrder (order, market);
+        const response = await this.privatePostOrder (request);
+        return this.parseOrders (response, market);
     }
 
     async fetchOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
