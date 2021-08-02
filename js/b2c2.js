@@ -6,14 +6,14 @@ const Exchange = require ('./base/Exchange');
 const { ExchangeError, ArgumentsRequired, AuthenticationError } = require ('./base/errors');
 const Precise = require ('./base/Precise');
 
-//  ---------------------------------------------------------------------------
+//  ----------------------------modelled on btcbox------------------------------------
 
 module.exports = class b2c2 extends Exchange {
     describe () {
         return this.deepExtend (super.describe (), {
             'id': 'b2c2',
             'name': 'B2C2',
-            'countries': [ 'GB' ], // United Kingdom of Great Britain
+            'countries': [ 'GB' ],
             'rateLimit': 500,
             'has': {
                 'cancelOrder': false,
@@ -68,18 +68,7 @@ module.exports = class b2c2 extends Exchange {
             },
             'markets': {
                 'BTCUSD.SPOT': { 'id': 'btc', 'symbol': 'BTCUSD.SPOT', 'base': 'BTC', 'quote': 'USD', 'baseId': 'btc', 'quoteId': 'usd' },
-                'ETH/AUD': { 'id': 'eth', 'symbol': 'ETH/AUD', 'base': 'ETH', 'quote': 'AUD', 'baseId': 'eth', 'quoteId': 'aud' },
-                'XRP/AUD': { 'id': 'xrp', 'symbol': 'XRP/AUD', 'base': 'XRP', 'quote': 'AUD', 'baseId': 'xrp', 'quoteId': 'aud' },
-                'LTC/AUD': { 'id': 'ltc', 'symbol': 'LTC/AUD', 'base': 'LTC', 'quote': 'AUD', 'baseId': 'ltc', 'quoteId': 'aud' },
-                'DOGE/AUD': { 'id': 'doge', 'symbol': 'DOGE/AUD', 'base': 'DOGE', 'quote': 'AUD', 'baseId': 'doge', 'quoteId': 'aud' },
-                'RFOX/AUD': { 'id': 'rfox', 'symbol': 'RFOX/AUD', 'base': 'RFOX', 'quote': 'AUD', 'baseId': 'rfox', 'quoteId': 'aud' },
-                'POWR/AUD': { 'id': 'powr', 'symbol': 'POWR/AUD', 'base': 'POWR', 'quote': 'AUD', 'baseId': 'powr', 'quoteId': 'aud' },
-                'NEO/AUD': { 'id': 'neo', 'symbol': 'NEO/AUD', 'base': 'NEO', 'quote': 'AUD', 'baseId': 'neo', 'quoteId': 'aud' },
-                'TRX/AUD': { 'id': 'trx', 'symbol': 'TRX/AUD', 'base': 'TRX', 'quote': 'AUD', 'baseId': 'trx', 'quoteId': 'aud' },
-                'EOS/AUD': { 'id': 'eos', 'symbol': 'EOS/AUD', 'base': 'EOS', 'quote': 'AUD', 'baseId': 'eos', 'quoteId': 'aud' },
-                'XLM/AUD': { 'id': 'xlm', 'symbol': 'XLM/AUD', 'base': 'XLM', 'quote': 'AUD', 'baseId': 'xlm', 'quoteId': 'aud' },
-                'RHOC/AUD': { 'id': 'rhoc', 'symbol': 'RHOC/AUD', 'base': 'RHOC', 'quote': 'AUD', 'baseId': 'rhoc', 'quoteId': 'aud' },
-                'GAS/AUD': { 'id': 'gas', 'symbol': 'GAS/AUD', 'base': 'GAS', 'quote': 'AUD', 'baseId': 'gas', 'quoteId': 'aud' },
+                'ETHUSD.SPOT': { 'id': 'eth', 'symbol': 'ETHUSD.SPOT', 'base': 'ETH', 'quote': 'USD', 'baseId': 'eth', 'quoteId': 'usd' },
             },
             'exceptions': { //https://docs.b2c2.net/#errors
                 '400': ExchangeError, // At least one parameter wasn't set
@@ -106,92 +95,53 @@ module.exports = class b2c2 extends Exchange {
 
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
-        const method = this.safeString (this.options, 'fetchBalance', 'private_post_my_balances');
-        const response = await this[method] (params);
-        //
-        // read-write api keys
-        //
-        //     ...
-        //
-        // read-only api keys
-        //
-        //     {
-        //         "status":"ok",
-        //         "balances":[
-        //             {
-        //                 "LTC":{"balance":0.1,"audbalance":16.59,"rate":165.95}
-        //             }
-        //         ]
-        //     }
-        //
+        const response = await this.privateGetBalance (params);
         const result = { 'info': response };
-        const balances = this.safeValue2 (response, 'balance', 'balances');
-        if (Array.isArray (balances)) {
-            for (let i = 0; i < balances.length; i++) {
-                const currencies = balances[i];
-                const currencyIds = Object.keys (currencies);
-                for (let j = 0; j < currencyIds.length; j++) {
-                    const currencyId = currencyIds[j];
-                    const balance = currencies[currencyId];
-                    const code = this.safeCurrencyCode (currencyId);
-                    const account = this.account ();
-                    account['total'] = this.safeString (balance, 'balance');
-                    result[code] = account;
-                }
-            }
-        } else {
-            const currencyIds = Object.keys (balances);
-            for (let i = 0; i < currencyIds.length; i++) {
-                const currencyId = currencyIds[i];
-                const code = this.safeCurrencyCode (currencyId);
+        const codes = Object.keys (this.currencies);
+        for (let i = 0; i < codes.length; i++) {
+            const code = codes[i];
+            const currency = this.currency (code);
+            const currencyId = currency['id'];
+            const free = currencyId + '_balance';
+            if (free in response) {
                 const account = this.account ();
-                account['total'] = this.safeString (balances, currencyId);
+                const used = currencyId + '_lock';
+                account['free'] = this.safeString (response, free);
+                account['used'] = this.safeString (response, used);
                 result[code] = account;
             }
         }
         return this.parseBalance (result, false);
     }
 
-    async fetchOrderBook (symbol, limit = undefined, params = {}) {
+    async fetchBalance (params = {}) {
+        //{
+        //    "USD": "0",
+        //    "BTC": "0",
+        //    "JPY": "0",
+        //    "GBP": "0",
+        //    "ETH": "0",
+        //    "EUR": "0",
+        //    "CAD": "0",
+        //    "LTC": "0",
+        //    "XRP": "0",
+        //    "BCH": "0"
+        //}
         await this.loadMarkets ();
-        const market = this.market (symbol);
-        const request = {
-            'cointype': market['id'],
-        };
-        const orderbook = await this.privatePostOrders (this.extend (request, params));
-        return this.parseOrderBook (orderbook, symbol, undefined, 'buyorders', 'sellorders', 'rate', 'amount');
-    }
-
-    async fetchTicker (symbol, params = {}) {
-        await this.loadMarkets ();
-        const response = await this.publicGetLatest (params);
-        let id = this.marketId (symbol);
-        id = id.toLowerCase ();
-        const ticker = response['prices'][id];
-        const timestamp = this.milliseconds ();
-        const last = this.safeNumber (ticker, 'last');
-        return {
-            'symbol': symbol,
-            'timestamp': timestamp,
-            'datetime': this.iso8601 (timestamp),
-            'high': undefined,
-            'low': undefined,
-            'bid': this.safeNumber (ticker, 'bid'),
-            'bidVolume': undefined,
-            'ask': this.safeNumber (ticker, 'ask'),
-            'askVolume': undefined,
-            'vwap': undefined,
-            'open': undefined,
-            'close': last,
-            'last': last,
-            'previousClose': undefined,
-            'change': undefined,
-            'percentage': undefined,
-            'average': undefined,
-            'baseVolume': undefined,
-            'quoteVolume': undefined,
-            'info': ticker,
-        };
+        const response = await this.privateGetBalance (params);
+        const data = response['data'];
+        const result = { 'info': response };
+        for (let i = 0; i < data.length; i++) {
+            const balance = data[i];
+            const currencyId = this.safeString (balance, 'currency');
+            const code = this.safeCurrencyCode (currencyId);
+            const account = this.account ();
+            account['used'] = this.safeString (balance, 'frozen');
+            account['free'] = this.safeString (balance, 'active');
+            account['total'] = this.safeString (balance, 'fix');
+            result[code] = account;
+        }
+        return this.parseBalance (result, false);
     }
 
     async fetchTrades (symbol, since = undefined, limit = undefined, params = {}) {
@@ -201,31 +151,11 @@ module.exports = class b2c2 extends Exchange {
             'cointype': market['id'],
         };
         const response = await this.privatePostOrdersHistory (this.extend (request, params));
-        //
-        //     {
-        //         "status":"ok",
-        //         "orders":[
-        //             {"amount":0.00102091,"rate":21549.09999991,"total":21.99969168,"coin":"BTC","solddate":1604890646143,"market":"BTC/AUD"},
-        //         ],
-        //     }
-        //
         const trades = this.safeValue (response, 'orders', []);
         return this.parseTrades (trades, market, since, limit);
     }
 
     parseTrade (trade, market = undefined) {
-        //
-        // public fetchTrades
-        //
-        //     {
-        //         "amount":0.00102091,
-        //         "rate":21549.09999991,
-        //         "total":21.99969168,
-        //         "coin":"BTC",
-        //         "solddate":1604890646143,
-        //         "market":"BTC/AUD"
-        //     }
-        //
         const priceString = this.safeString (trade, 'rate');
         const amountString = this.safeString (trade, 'amount');
         const price = this.parseNumber (priceString);
@@ -264,19 +194,6 @@ module.exports = class b2c2 extends Exchange {
             'cointype': this.marketId (symbol),
             'amount': amount,
             'rate': price,
-        };
-        return await this[method] (this.extend (request, params));
-    }
-
-    async cancelOrder (id, symbol = undefined, params = {}) {
-        const side = this.safeString (params, 'side');
-        if (side !== 'buy' && side !== 'sell') {
-            throw new ArgumentsRequired (this.id + ' cancelOrder() requires a side parameter, "buy" or "sell"');
-        }
-        params = this.omit (params, 'side');
-        const method = 'privatePostMy' + this.capitalize (side) + 'Cancel';
-        const request = {
-            'id': id,
         };
         return await this[method] (this.extend (request, params));
     }
