@@ -5,6 +5,7 @@
 const Exchange = require ('./base/Exchange');
 const { ExchangeError } = require ('./base/errors');
 const Precise = require ('./base/Precise');
+const { uuid } = require('./base/functions/string');
 
 //  ---------------------------------------------------------------------------
 
@@ -65,9 +66,9 @@ module.exports = class b2c2 extends Exchange {
                 },
             },
             'markets': {
-                'BTCUSD.SPOT': { 'id': 'btc', 'symbol': 'BTCUSD.SPOT', 'base': 'BTC', 'quote': 'USD', 'baseId': 'btc', 'quoteId': 'usd' },
-                'ETHUSD.SPOT': { 'id': 'eth', 'symbol': 'ETHUSD.SPOT', 'base': 'ETH', 'quote': 'USD', 'baseId': 'eth', 'quoteId': 'usd' },
-                'XRPUSD.SPOT': { 'id': 'xrp', 'symbol': 'XRPUSD.SPOT', 'base': 'XRP', 'quote': 'USD', 'baseId': 'xrp', 'quoteId': 'usd' },
+                'BTCUSD.SPOT': { 'id': 'BTCUSD.SPOT', 'symbol': 'BTCUSD', 'base': 'BTC', 'quote': 'USD', 'baseId': 'btc', 'quoteId': 'usd' },
+                'ETHUSD.SPOT': { 'id': 'ETHUSD.SPOT', 'symbol': 'ETHUSD', 'base': 'ETH', 'quote': 'USD', 'baseId': 'eth', 'quoteId': 'usd' },
+                'XRPUSD.SPOT': { 'id': 'XRPUSD.SPOT', 'symbol': 'XRPUSD', 'base': 'XRP', 'quote': 'USD', 'baseId': 'xrp', 'quoteId': 'usd' },
             },
             'exceptions': {
                 '400': ExchangeError, // At least one parameter wasn't set
@@ -127,6 +128,7 @@ module.exports = class b2c2 extends Exchange {
         // const locked = this.safeValue (market, 'locked');
         // const active = !locked;
         const id = this.safeString (market, 'name');
+        const symbol = this.safeString (market, 'underlier'); // needs to be base/quote!!
         const type = this.safeString (market, 'type');
         // const baseId = this.safeString (market, 'baseCurrency');
         // const quoteId = this.safeString (market, 'quoteCurrency');
@@ -151,7 +153,7 @@ module.exports = class b2c2 extends Exchange {
         // const maker = this.safeNumber (market, 'makerFee');
         return {
             'id': id,
-            'symbol': undefined,
+            'symbol': symbol,
             'base': undefined,
             'quote': undefined,
             'baseId': undefined,
@@ -249,31 +251,28 @@ module.exports = class b2c2 extends Exchange {
     async createOrder (symbol, type, side, amount, price = undefined, params = {}) {
         await this.loadMarkets ();
         const market = this.market (symbol);
-        const uppercaseSide = side.toUpperCase ();
+        const lowercaseSide = side.toLowerCase ();
         const uppercaseType = type.toUpperCase ();
         const request = {
-            'client_order_id': '123456', // to parameterise
+            'client_order_id': uuid ().toString (), // to parameterise
             'quantity': this.amountToPrecision (symbol, amount),
-            'side': uppercaseSide,
+            'side': lowercaseSide,
             'instrument': market['id'],
-            'order_type': uppercaseType,
-            // 'expireIn': 1575523308, // in seconds
-            // 'expireTime': 1575523308, // unix timestamp
+            'valid_until': '2022-08-04 10:05:15.00000', // need to do properly
         };
         if (uppercaseType === 'LIMIT') {
             request['order_type'] = 'FOK';
             request['price'] = this.priceToPrecision (symbol, price);
         } else {
             request['order_type'] = 'MKT';
-            request['price'] = 0;
         }
         const response = await this.privatePostOrder (request);
-        return this.parseOrders (response, market);
+        return this.parseOrder (response, market);
     }
 
     async fetchOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
         await this.loadMarkets ();
-        const market = this.market (symbol);
+        // const market = this.market (symbol);
         const request = {
             'created__gte': undefined,
             'created__lt': undefined,
@@ -284,7 +283,8 @@ module.exports = class b2c2 extends Exchange {
             'limit': 1000,
         };
         const response = await this.privateGetOrder (request);
-        return this.parseOrders (response, market, since, limit);
+        // return this.parseOrders (response, market, since, limit);
+        return this.parseOrders (response, undefined, since, limit);
     }
 
     parseOrder (order, market = undefined) {

@@ -12,47 +12,36 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     // instantiate the exchange
     let exchange = new ccxt.b2c2  ({
-        "apiKey": "c2ed21ef1e8c278dde40bafdb6b81736f93fb7b1",
+        "apiKey": "insert api key here",
     })
 
     // fetch currencies from the exchange
-    // let currencies = await exchange.fetchCurrencies ()
-
-    // output the result
-    // log (exchange.name.green, 'currencies', currencies)
+    let currencies = await exchange.fetchCurrencies ()
+    log (exchange.name.green, 'currencies', currencies)
 
     // fetch markets from the exchange
-    // let markets = await exchange.fetchMarkets ()
+    let markets = await exchange.fetchMarkets ()
+    log (exchange.name.green, 'markets', markets)
 
-    // output the result
-    // log (exchange.name.green, 'markets', markets)
-    // fetch markets from the exchange
+    // fetch orders from the exchange
+    let orders = await exchange.fetchOrders ()
+    log (exchange.name.green, 'orders', orders)
 
-    // let orders = await exchange.fetchOrders ()
+    // fetch ledger items from the exchange
+    let ledger = await exchange.fetchLedger ()
+    log (exchange.name.green, 'ledger', ledger)
 
-    // // output the result
-    // log (exchange.name.green, 'orders', orders)
+    // fetch trades from the exchange
+    let trades = await exchange.fetchMyTrades ()
+    log (exchange.name.green, 'trades', trades)
 
-    // let ledger = await exchange.fetchLedger ()
-
-    // // output the result
-    // log (exchange.name.green, 'ledger', ledger)
-
-    // let trades = await exchange.fetchMyTrades ()
-
-    // // output the result
-    // log (exchange.name.green, 'trades', trades)
-
-    let order = await exchange.createOrder ('ETHUSD.SPOT', 'MARKET', 'BUY', 1,)
-
-    // output the result
+    // create a new order on the exchange
+    let order = await exchange.createOrder ('ETHUSD', 'MARKET', 'BUY', 1,)
     log (exchange.name.green, 'order', order)
 
     // fetch account balance from the exchange
-    // let balance = await exchange.fetchBalance ()
-
-    // output the result
-    // log (exchange.name.green, 'balance', balance)
+    let balance = await exchange.fetchBalance ()
+    log (exchange.name.green, 'balance', balance)
 
 
 }) ()
